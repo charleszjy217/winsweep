@@ -178,10 +178,10 @@
 │ 将处理 4 个类别 · 共 76,223 个文件 · 合计 11.74 GB            │
 │ 模式: 移入回收站 (可恢复)                                     │
 │ ┌──────────────────────────────────────────────────────────┐│
-│ │ C:\Users\13419\AppData\Local\pip\cache\...           3.22G││
-│ │ C:\Users\13419\AppData\Roaming\npm-cache\...         2.92G││
-│ │ C:\Users\13419\.gradle\caches\...                    3.63G││
-│ │ C:\Users\13419\AppData\Local\Temp\...                1.12G││
+│ │ C:\Users\<用户名>\AppData\Local\pip\cache\...        3.22G││
+│ │ C:\Users\<用户名>\AppData\Roaming\npm-cache\...      2.92G││
+│ │ C:\Users\<用户名>\.gradle\caches\...                 3.63G││
+│ │ C:\Users\<用户名>\AppData\Local\Temp\...             1.12G││
 │ │ ... (可滚动，支持按路径搜索)                              ││
 │ └──────────────────────────────────────────────────────────┘│
 │                          [ 导出清单.txt ]   [ 取消 ] [ 继续 ] │

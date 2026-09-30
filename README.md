@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="src-tauri/icons/128x128.png" width="112" alt="WinSweep logo" />
+<img src="docs/logo.png" width="112" alt="WinSweep logo" />
 
 # WinSweep
 
