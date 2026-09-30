@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'" />
+  <link rel="icon" href="favicon.ico" />
+  <title>WinSweep · 磁盘垃圾扫描与安全清理</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- 标题栏 -->
+    <header class="titlebar">
+      <div class="brand">
+        <span class="prompt">❯</span>
+        <span class="brand-name">WinSweep</span>
+        <span class="brand-sub">磁盘垃圾扫描与安全清理</span>
+      </div>
+      <div class="titlebar-actions">
+        <button id="monitorToggle" class="pill" type="button">
+          实时监控 <span class="dot" id="monitorDot"></span><span id="monitorLabel">OFF</span>
+        </button>
+        <button id="settingsBtn" class="pill" type="button">⚙ 设置</button>
+      </div>
+    </header>
+
+    <!-- 磁盘可用空间 -->
+    <section class="diskbar">
+      <div class="disk-label" id="diskLabel">C:\ 可用 -- / 总 --</div>
+      <div class="disk-track"><div class="disk-fill" id="diskFill"></div></div>
+      <div class="scan-status" id="scanStatus">已扫描: 待扫描</div>
+    </section>
+
+    <!-- 工具栏 -->
+    <section class="toolbar">
+      <button id="scanBtn" class="btn primary" type="button">❯ 开始扫描</button>
+      <button id="dryRunToggle" class="btn ghost" type="button">模拟清理 dry-run: OFF</button>
+      <button id="openRecycleBtn" class="btn ghost" type="button">📂 打开回收站</button>
+      <span class="spacer"></span>
+      <span class="scan-time" id="scanTime">扫描耗时: --</span>
+      <button id="cancelBtn" class="btn danger hidden" type="button">取消</button>
+    </section>
+
+    <!-- 进度条 -->
+    <section class="progress-wrap hidden" id="progressWrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-path" id="progressPath">--</div>
+    </section>
+
+    <!-- 类别表 -->
+    <section class="categories">
+      <div class="cat-head">
+        <span class="col-check"><input type="checkbox" id="selectAll" title="全选/全不选" /></span>
+        <span class="col-name">类别</span>
+        <span class="col-size">大小</span>
+        <span class="col-count">文件数</span>
+        <span class="col-risk">安全等级</span>
+        <span class="col-sel">选中</span>
+      </div>
+      <div class="cat-body" id="catBody"></div>
+      <div class="cat-empty" id="catEmpty">尚未扫描，点击「❯ 开始扫描」获取全盘垃圾视图。</div>
+    </section>
+
+    <!-- 汇总条 -->
+    <section class="summary-bar">
+      <span id="summaryText">已选: 0 类 · 合计 0 B</span>
+      <span class="spacer"></span>
+      <button id="invertBtn" class="btn ghost small" type="button">反选</button>
+    </section>
+
+    <!-- 底栏 -->
+    <footer class="footer">
+      <div class="mode-group">
+        <span class="footer-label">清理模式:</span>
+        <label class="radio"><input type="radio" name="mode" value="recycleBin" checked /> 移入回收站(可恢复)</label>
+        <label class="radio"><input type="radio" name="mode" value="permanent" /> 永久删除(不可恢复)</label>
+      </div>
+      <span class="spacer"></span>
+      <button id="previewBtn" class="btn ghost" type="button">预览清理清单</button>
+      <button id="cleanBtn" class="btn primary" type="button">❯ 清理选中项</button>
+    </footer>
+  </div>
+
+  <!-- 预览弹窗 -->
+  <div class="modal-mask hidden" id="previewModal">
+    <div class="modal">
+      <div class="modal-head">清理清单预览</div>
+      <div class="modal-sub" id="previewSummary">--</div>
+      <div class="modal-warnings" id="previewWarnings"></div>
+      <div class="preview-tools">
+        <input id="previewSearch" class="search" type="text" placeholder="按路径搜索…" />
+        <button id="previewExport" class="btn ghost small" type="button">导出清单 .txt</button>
+      </div>
+      <div class="preview-list" id="previewList"></div>
+      <div class="modal-foot">
+        <button id="previewCancel" class="btn ghost" type="button">取消</button>
+        <button id="previewContinue" class="btn primary" type="button">继续</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 二次确认弹窗 -->
+  <div class="modal-mask hidden" id="confirmModal">
+    <div class="modal small">
+      <div class="modal-head danger">⚠ 确认清理</div>
+      <div class="confirm-body" id="confirmBody"></div>
+      <div class="modal-foot">
+        <button id="confirmBack" class="btn ghost" type="button">返回检查</button>
+        <button id="confirmGo" class="btn danger-fill" type="button">确认清理</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 清理结果报告 -->
+  <div class="modal-mask hidden" id="reportModal">
+    <div class="modal">
+      <div class="modal-head">清理结果报告</div>
+      <div class="report-body" id="reportBody"></div>
+      <div class="modal-foot">
+        <button id="reportClose" class="btn primary" type="button">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 设置抽屉 -->
+  <aside class="drawer hidden" id="settingsDrawer">
+    <div class="drawer-head">
+      <span>⚙ 设置</span>
+      <button id="drawerClose" class="icon-btn" type="button">✕</button>
+    </div>
+    <div class="drawer-body">
+      <section class="set-sec">
+        <h4>外观</h4>
+        <div class="set-row"><span>主题</span>
+          <select id="themeSelect"><option value="dark">暗色</option><option value="black">纯黑</option></select>
+        </div>
+        <div class="set-row"><span>字体</span>
+          <select id="fontSelect"><option value="Consolas">Consolas</option><option value="JetBrains Mono">JetBrains Mono</option><option value="Cascadia Code">Cascadia Code</option></select>
+        </div>
+      </section>
+
+      <section class="set-sec">
+        <h4>默认清理模式</h4>
+        <label class="radio"><input type="radio" name="defmode" value="recycleBin" /> 移入回收站（默认，可恢复）</label>
+        <label class="radio"><input type="radio" name="defmode" value="permanent" /> 永久删除（不可恢复）</label>
+      </section>
+
+      <section class="set-sec">
+        <h4>实时监控</h4>
+        <div class="set-row"><span>监控目录</span><input id="monitorDirsInput" class="search" type="text" placeholder="%TEMP%;C:\另外目录" /></div>
+        <label class="radio"><input type="radio" name="monpolicy" value="notifyOnly" /> 仅提醒（默认）</label>
+        <label class="radio"><input type="radio" name="monpolicy" value="recycleBin" /> 自动移入回收站</label>
+        <p class="hint">实时监控不支持「自动永久删除」，从机制上杜绝静默不可逆删除。</p>
+      </section>
+
+      <section class="set-sec">
+        <h4>保护名单（黑名单 · 只读）</h4>
+        <div class="blacklist" id="blacklistView"></div>
+      </section>
+
+      <section class="set-sec">
+        <h4>排除规则（通配符）</h4>
+        <div class="set-row">
+          <input id="excludeInput" class="search" type="text" placeholder="如 *.log" />
+          <button id="excludeAdd" class="btn ghost small" type="button">+ 添加</button>
+        </div>
+        <div class="chips" id="excludeChips"></div>
+        <p class="hint">首版排除规则仅本地记录展示，不参与清理判定（见架构 §9）。</p>
+      </section>
+
+      <section class="set-sec">
+        <h4>自定义类别（只读）</h4>
+        <div class="blacklist" id="customCatsView"></div>
+        <p class="hint">自定义类别数据结构已预留，首版仅只读展示。</p>
+      </section>
+    </div>
+    <div class="drawer-foot">
+      <button id="saveSettings" class="btn primary" type="button">保存设置</button>
+    </div>
+  </aside>
+
+  <!-- 监控面板 -->
+  <div class="monitor-panel hidden" id="monitorPanel">
+    <div class="monitor-head">
+      <span>实时监控 · 事件流</span>
+      <span class="spacer"></span>
+      <span id="monitorStatus">空闲</span>
+      <button id="monitorPanelClose" class="icon-btn" type="button">✕</button>
+    </div>
+    <div class="monitor-list" id="monitorList"></div>
+  </div>
+
+  <!-- 提示 -->
+  <div class="toast-wrap" id="toastWrap"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

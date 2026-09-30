@@ -1,0 +1,21 @@
+# Normalize line endings for all text files to LF in the repository.
+* text=auto eol=lf
+
+# Treat the following as binary (no EOL conversion, no diff).
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.icns binary
+*.exe  binary
+*.dll  binary
+*.lib  binary
+*.pdb  binary
+*.zip  binary
+
+# Explicit language hints.
+*.rs   text diff=rust
+*.md   text
+*.yml  text
+*.json text

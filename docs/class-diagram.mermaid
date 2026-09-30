@@ -1,0 +1,114 @@
+classDiagram
+    class RiskLevel { <<enum>> Low Medium High }
+    class CleanMode { <<enum>> RecycleBin Permanent }
+    class CleanSemantics { <<enum>> Normal EmptyRecycleBin }
+    class ScanStatus { <<enum>> Ok NotFound Skipped Error }
+    class MonitorPolicy { <<enum>> NotifyOnly RecycleBin }
+
+    class Category {
+        +String id
+        +String name
+        +RiskLevel risk
+        +bool defaultSelected
+        +bool requiresAdmin
+        +CleanSemantics semantics
+        +String description
+    }
+    class CategoryResult {
+        +String id
+        +String name
+        +RiskLevel risk
+        +bool defaultSelected
+        +bool requiresAdmin
+        +CleanSemantics semantics
+        +Vec~String~ roots
+        +u64 totalSize
+        +u64 fileCount
+        +ScanStatus status
+        +Option~String~ error
+    }
+    class DiskInfo { +String drive +u64 totalBytes +u64 freeBytes }
+    class ScanReport {
+        +String scanId
+        +String startedAt
+        +String finishedAt
+        +u64 durationMs
+        +Vec~CategoryResult~ categories
+        +u64 totalSize
+        +u64 totalFiles
+        +DiskInfo disk
+    }
+    class PreviewRequest { +Vec~String~ categoryIds +CleanMode mode }
+    class PreviewEntry {
+        +String categoryId +String categoryName
+        +String path +u64 size +bool isDir
+    }
+    class PreviewPlan {
+        +Vec~String~ categoryIds
+        +CleanMode mode
+        +Vec~PreviewEntry~ entries
+        +bool entriesTruncated
+        +u64 totalFiles
+        +u64 totalSize
+        +bool hasHighRisk
+        +Vec~String~ warnings
+    }
+    class CleanRequest {
+        +Vec~String~ categoryIds +CleanMode mode
+        +bool dryRun +bool confirmed
+    }
+    class CategoryCleanStat {
+        +String id +String name
+        +u64 freedBytes +u64 deletedCount
+        +u64 skippedCount +u64 failedCount
+    }
+    class SkipRecord { +String path +String reason }
+    class CleanReport {
+        +String cleanedAt +CleanMode mode +bool dryRun
+        +u64 freedBytes +u64 deletedCount +u64 skippedCount +u64 failedCount
+        +Vec~CategoryCleanStat~ perCategory
+        +Vec~SkipRecord~ skippedSamples
+        +Vec~String~ notes
+    }
+    class MonitorConfig { +Vec~String~ dirs +MonitorPolicy policy }
+    class MonitorStatus {
+        +bool running +Vec~String~ dirs
+        +MonitorPolicy policy +u64 eventsCount
+    }
+    class CustomCategory { +String id +String name +String path +RiskLevel risk }
+    class Settings {
+        +CleanMode defaultMode
+        +bool monitorEnabled
+        +Vec~String~ monitorDirs
+        +MonitorPolicy monitorPolicy
+        +Vec~CustomCategory~ customCategories
+        +String theme +String font
+    }
+    class AppState {
+        +Arc~AtomicBool~ cancel
+        +Arc~AtomicBool~ busy
+        +Mutex~Settings~ settings
+        +Mutex~Option~MonitorHandle~~ monitor
+    }
+    class AppError { +String code +String message }
+
+    ScanReport "1" *-- "*" CategoryResult
+    ScanReport "1" *-- "1" DiskInfo
+    PreviewPlan "1" *-- "*" PreviewEntry
+    CleanReport "1" *-- "*" CategoryCleanStat
+    CleanReport "1" *-- "*" SkipRecord
+    Settings "1" *-- "*" CustomCategory
+    CategoryResult ..> RiskLevel
+    CategoryResult ..> CleanSemantics
+    CategoryResult ..> ScanStatus
+    Category ..> RiskLevel
+    Category ..> CleanSemantics
+    PreviewRequest ..> CleanMode
+    PreviewPlan ..> CleanMode
+    CleanRequest ..> CleanMode
+    CleanReport ..> CleanMode
+    MonitorConfig ..> MonitorPolicy
+    MonitorStatus ..> MonitorPolicy
+    Settings ..> CleanMode
+    Settings ..> MonitorPolicy
+    AppState ..> Settings

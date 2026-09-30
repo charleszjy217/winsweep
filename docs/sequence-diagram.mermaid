@@ -1,0 +1,120 @@
+%% WinSweep 关键调用流程（3 张时序图）
+
+%% ============ (a) 扫描全流程 ============
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant UI as 前端 app.js
+    participant CMD as 命令层 lib.rs
+    participant SCAN as 扫描引擎 scan.rs
+    participant CAT as 类别定义 categories.rs
+    participant SAFE as 安全守卫 safety.rs
+
+    U->>UI: 点击「开始扫描」
+    UI->>CMD: invoke("scan_all")
+    CMD->>CMD: busy=true; cancel=false; 生成 scan_id/started_at
+    CMD->>CMD: 启动进度线程(每250ms emit scan://progress)
+    par rayon 并行遍历各类别
+        CMD->>CAT: resolve_roots(id)
+        CAT-->>CMD: 展开后的根路径
+        CMD->>SCAN: scan_category(roots, &cancel)
+        loop 每个文件/目录(walkdir)
+            SCAN->>SAFE: is_protected(path)?
+            SAFE-->>SCAN: false
+            SCAN->>SCAN: 累加 size / file_count
+        end
+        SCAN-->>CMD: CategoryResult
+        CMD-->>UI: emit("scan://category", CategoryResult)
+    end
+    CMD->>CMD: get_disk_info("C:")
+    CMD->>CMD: busy=false
+    CMD-->>UI: ScanReport
+    UI->>UI: 渲染类别表格 + 汇总条 + 磁盘条
+
+%% ============ (b) 预览 → 二次确认 → 双模式清理 ============
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant UI as 前端 app.js
+    participant CMD as 命令层 lib.rs
+    participant SAFE as 安全守卫 safety.rs
+    participant CLEAN as 清理引擎 clean.rs
+    participant OS as Windows / 回收站
+
+    U->>UI: 勾选类别 + 选择模式
+    UI->>CMD: invoke("preview_clean", {categoryIds, mode})
+    CMD->>SAFE: 过滤黑名单 + 校验允许根
+    SAFE-->>CMD: 可清理清单
+    CMD-->>UI: PreviewPlan(含 warnings / hasHighRisk)
+    UI->>U: 弹出预览面板(路径抽样/大小/告警)
+    U->>UI: 点击「继续」
+    UI->>U: 二次确认弹窗(影响 N 文件 / M GB / 模式)
+    U->>UI: 点击「确认清理」
+    UI->>CMD: invoke("execute_clean", {categoryIds, mode, dryRun, confirmed:true})
+
+    alt confirmed = false
+        CMD-->>UI: Err{code:"E_NOT_CONFIRMED"}
+    else dryRun = true
+        CLEAN->>OS: 仅 stat / 查询(零改动)
+        CMD-->>UI: CleanReport(模拟, dry_run=true)
+    else 实际清理
+        loop 每个类别
+            alt semantics = EmptyRecycleBin
+                CLEAN->>OS: SHEmptyRecycleBinW(...)
+            else semantics = Normal
+                loop 每个文件/目录
+                    CLEAN->>SAFE: is_protected / is_locked?
+                    alt 受保护 or 占用 or 无权限
+                        CLEAN->>CLEAN: 跳过并记入 skipped_samples
+                    else 可删
+                        alt mode = RecycleBin
+                            CLEAN->>OS: trash::delete(path)
+                        else mode = Permanent
+                            CLEAN->>OS: fs::remove_file / remove_dir_all
+                        end
+                    end
+                end
+            end
+            CLEAN-->>UI: emit("clean://progress", {...})
+        end
+        CMD-->>UI: CleanReport(释放/成功/跳过/失败/notes)
+    end
+    UI->>U: 展示结果报告
+
+%% ============ (c) 实时监控流程 ============
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant UI as 前端(设置面板)
+    participant CMD as 命令层 lib.rs
+    participant WATCH as 实时监控 watcher.rs
+    participant NOTIFY as notify Watcher
+    participant SAFE as 安全守卫 safety.rs
+    participant OS as 文件系统 / 回收站
+
+    U->>UI: 打开「实时监控」开关(默认关)
+    UI->>CMD: invoke("start_monitor", {dirs, policy})
+    CMD->>WATCH: start(dirs, policy)
+    WATCH->>NOTIFY: RecommendedWatcher::watch(dirs, Recursive)
+    NOTIFY-->>WATCH: 就绪
+    WATCH-->>CMD: MonitorStatus(running=true)
+    CMD-->>UI: MonitorStatus
+    CMD-->>UI: emit("monitor://status", ...)
+    Note over WATCH: 策略仅 NotifyOnly / RecycleBin —— 无永久删除
+
+    NOTIFY-->>WATCH: 事件(Create/Modify)
+    WATCH->>WATCH: 防抖(≈800ms 合并)
+    WATCH->>SAFE: is_protected / 扩展名与目录过滤
+    SAFE-->>WATCH: 可处理
+    alt policy = NotifyOnly
+        WATCH-->>UI: emit("monitor://event", {action:"notify"})
+        UI->>U: 提醒列表/桌面提示
+    else policy = RecycleBin
+        WATCH->>OS: trash::delete(path)
+        WATCH-->>UI: emit("monitor://event", {action:"trashed"})
+    end
+
+    U->>UI: 关闭开关
+    UI->>CMD: invoke("stop_monitor")
+    CMD->>WATCH: stop() -> drop(watcher)
+    CMD-->>UI: MonitorStatus(running=false)

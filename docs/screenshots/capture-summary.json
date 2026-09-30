@@ -1,0 +1,26 @@
+﻿[
+    {
+        "File":  "01-main.png",
+        "Desc":  "main screen",
+        "Bytes":  126813,
+        "Dim":  "1672x1226",
+        "Mode":  "window 1672x1226",
+        "Saved":  true
+    },
+    {
+        "File":  "02-scanning.png",
+        "Desc":  "scan in progress (best-effort)",
+        "Bytes":  123079,
+        "Dim":  "1672x1226",
+        "Mode":  "window 1672x1226",
+        "Saved":  true
+    },
+    {
+        "File":  "03-results.png",
+        "Desc":  "scan results / preview (best-effort)",
+        "Bytes":  140488,
+        "Dim":  "1672x1226",
+        "Mode":  "window 1672x1226",
+        "Saved":  true
+    }
+]

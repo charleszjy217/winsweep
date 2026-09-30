@@ -1,0 +1,84 @@
+name: build
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build (Windows x64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Setup Rust (MSVC)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      # 图标已随仓库提交（src-tauri/icons/icon.ico 存在则跳过重建）。
+      - name: Generate icons (only if missing)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "src-tauri/icons/icon.ico")) {
+            Write-Host "icon.ico missing -> regenerating icons"
+            python scripts/gen_icon.py
+            Copy-Item scripts/app-icon.png src-tauri/app-icon.png -Force
+            npx tauri icon src-tauri/app-icon.png --output src-tauri/icons
+          } else {
+            Write-Host "icon.ico already present -> skip icon generation"
+          }
+
+      - name: Build release binary
+        working-directory: src-tauri
+        run: cargo build --release --locked
+
+      - name: Verify artifact
+        shell: pwsh
+        run: |
+          $exe = "src-tauri/target/release/winsweep.exe"
+          if (-not (Test-Path $exe)) { throw "build artifact not found: $exe" }
+          $size = (Get-Item $exe).Length
+          Write-Host ("winsweep.exe size = {0} bytes" -f $size)
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: winsweep-windows-x64
+          path: src-tauri/target/release/winsweep.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      # 仅在推送 v* tag 时创建 GitHub Release 并附加 exe。
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: WinSweep ${{ github.ref_name }}
+          files: src-tauri/target/release/winsweep.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: false
