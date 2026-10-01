@@ -89,7 +89,7 @@ npm run dev      # 开发（tauri dev）
 
 ## 技术说明
 
-- **零 Tauri 插件**：「打开文件夹/回收站」由自研 `open_path` 调 `explorer.exe` 实现。
+- **零 Tauri 插件**：「打开文件夹/回收站」由 `open_path` 调 `explorer.exe` 实现。
 - **Win32 FFI**：`win/shell.rs` 以 `extern "system"` 直接绑定 `shell32`/`kernel32`
   （语义与 windows crate 一致，规避版本签名差异并压缩体积）。
 - **时间戳**：手写 RFC3339（`std::time`），不引 chrono。
